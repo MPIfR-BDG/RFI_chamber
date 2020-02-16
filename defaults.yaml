@@ -1,0 +1,117 @@
+# YAML configuration file for RFI chamber observations
+# Note:
+#   - SCPI commands below should be double quoted to
+#     avoid YAML parsing errors.
+spectrumAnalyser:
+  visaResource: "TCPIP::134.104.26.244::inst0::INSTR"
+  scpiCommands: []
+    # Here the user can define the set of SCPI
+    # commands that will be run on script start
+    # up. These should be common configuration
+    # parameters that are valid for all measurements.
+firstStageChanneliser:
+  boffile: unknown
+  numChannels: 32768
+measurementParameters:
+  # Below the user can define a list of measurements
+  # to be performed.
+  - userTag: LowRange_500-3600MHz_100Hz_6sec
+    # userTag is a string that will be added to the
+    # output filename for this measurement. This will
+    # be added to the .rfi files for this measurement
+    # set as the UserFriendlyName.
+    spectrumAnalyserScpi:
+      # These are the list of measurement specific SCPI
+      # command to be executed prior to the meaurement
+      - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV -10"
+    frequencyRange:
+      # Frequency range is defined as the complete span
+      # of frequency desired in the measurement. Practically
+      # the script will use the analysis bandwidth as a step
+      # size and compute n discrete frequency blocks to be
+      # measured that in aggregate cover the complete desired
+      # frequency range.
+      # For example take the following parameters:
+      #   start = 13.5
+      #   end = 15.8
+      #   units = GHz
+      # Here we will determine the analysis bandwidth from
+      # the SCPI interface and choose the first frequency
+      # blocks centre frequency as:
+      #     start + analysis_bandwidth / 2
+      # The second centre frequency will be:
+      #     start + 3 * analysis_bandwidth / 2
+      # and so on. Assuming an analysis bandwidth of 460 MHz
+      # the following array of centre frequencies will be
+      # observed:
+      #
+      # 13.96, 14.42, 14.88, 15.34 GHz
+      #
+      # An internal check is made to limit the span to
+      # only that available from the spectrum analyser.
+      start: 500
+      end: 36000
+      units: MHz
+    spectrometerParams:
+      # These are the parameters used to configure the
+      # FPGA/GPU spectrometer system.
+      resolution: 0.1
+      resolutionUnits: Hz
+      # The desired frequency resolution in user defined units.
+      # From this and the sampling rate (read from the analyser
+      # via SCPI command) the number of channels in the output
+      # spectrum will be calculated. For efficiency reasons, the
+      # FFT length will be rounded up to the next highest power
+      # of two meaning that the output resolution will be the
+      # same or finer than the desired value.
+      integrationTime: 6
+      integrationTimeUnits: s
+      # The desired integration time in user defined units.
+      # The actual integration time will be rounded to the next
+      # whole number of complete output spectra (e.g. if 0.1 Hz
+      # resolution is desured, the integration time will be rounded
+      # up to the next multiple of 10 seconds).
+      outputPath: ./
+      # The output file path where spectra will be recorded
+  - userTag: MidRange_3600-600MHz_10Hz_10sec
+    spectrumAnalyserScpi:
+      - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV -15"
+    frequencyRange:
+      start: 3600
+      end: 6000
+      units: MHz
+    spectrometerParams:
+      resolution: 10
+      resolutionUnits: Hz
+      integrationTime: 10
+      integrationTimeUnits: s
+      outputPath: ./
+  - userTag: HighRange_6000-8000MHz_1Hz_10sec
+    spectrumAnalyserScpi:
+      - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV -15"
+    frequencyRange:
+      start: 6000
+      end: 8000
+      units: MHz
+    spectrometerParams:
+      resolution: 1
+      resolutionUnits: Hz
+      integrationTime: 10
+      integrationTimeUnits: s
+      outputPath: ./
+headerInformation:
+  # Extra configuration information to be propagated
+  # verbatim into the output *.rfi files. This content
+  # is completely user defined.
+  - "Data Acquisition System: Spectromonster"
+  - "Chamber Calibration: default"
+  - "Antenna Calibration: default"
+  - "Cable Calibration: default"
+  - "LNA Calibration: default"
+  - "Background Data: unknown"
+  # chamber type reverb | anechoic | freespace | test ?
+  - "Chamber Type: reverb"
+
+
+
+

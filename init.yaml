@@ -1,0 +1,24 @@
+# YAML configuration file for RFI chamber observations
+# Note:
+#   - SCPI commands below should be double quoted to
+#     avoid YAML parsing errors.
+spectrumAnalyser:
+  visaResource: "TCPIP::134.104.26.244::inst0::INSTR"
+  scpiCommands:
+    # Here the user can define the set of SCPI
+    # commands that will be run on script start
+    # up. These should be common configuration
+    # parameters that are valid for all measurements.
+    - "*RST"
+    - ":SYST:DISP:UPD ON"
+    - ":INST:CRE:REPL 'Spectrum', IQ, 'IQ Analyzer'"
+    - ":LAY:REPL:WIND '1', FREQ"
+    - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV 30"
+    - ":TRAC:IQ:SRAT 512000000"
+    - ":OUTP:IQHS:STAT 1"
+    - "*OPC"
+    - "@LOC"
+
+
+
+
