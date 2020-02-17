@@ -148,9 +148,7 @@ class Spectrometer(object):
             "-o", output_file,
             "--log-level", "info"],
             stdout=sys.stdout, stderr=sys.stderr)
-        for ln in self._spec_proc.stdout:
-            if "RSSpectrometer instance initialised" in ln:
-                break
+        time.sleep(10)
 
     def record(self):
         log.debug("Starting mkrecv")
