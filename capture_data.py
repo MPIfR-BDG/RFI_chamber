@@ -3,10 +3,18 @@ import time
 import pyvisa
 import yaml
 import coloredlogs
+import sys
+import os
 import numpy as np
+from subprocess import Popen, PIPE
 import astropy.units as u
 
 log = logging.getLogger('capture_data')
+
+DADA_BLOCK_SIZE = 8589934592
+DADA_NBLOCKS = 6
+DADA_KEY = "dada"
+MKRECV_CONF = "/root/mkrecv.cfg"
 
 
 class SpectrumAnalyserException(Exception):
@@ -95,21 +103,65 @@ class Measurement(object):
         return centre_freqs
 
 
+def syscmd_wrapper(cmd):
+    proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    if proc.wait() != 0:
+        stdout = proc.stdout.read()
+        stderr = proc.stderr.read()
+        raise Exception("Command: '{}' failed\nstdout: {}\nstderr: {}".format(
+            " ".join(cmd), stdout, stderr))
+
+
 class Spectrometer(object):
     def __init__(self):
-        pass
+        self._mkrecv_proc = None
+        self._spec_proc = None
 
-    def configure(self, input_nchans, fft_length):
-        pass
+    def configure(
+        self, input_nchans, fft_length, naccumulate, output_file):
+        # Destroy any previous DADA buffers
+        log.debug("Cleaning up any previous DADA buffers")
+        try:
+            syscmd_wrapper(["dada_db", "-k", DADA_KEY, "-d"])
+        except Exception as e:
+            pass
 
-    def record(self, naccumulate, frequency, tag, output_path):
-        pass
+        # Create new DADA buffer
+        log.debug("Allocating DADA buffer")
+        syscmd_wrapper(["dada_db",
+                        "-k", DADA_KEY,
+                        "-b", str(DADA_BLOCK_SIZE),
+                        "-n", str(DADA_NBLOCKS),
+                        "-l", "-p"])
+        # Here we would start the spectrometer
+        # and attach it to the DADA buffer
+        log.debug("Starting spectrometer")
+        os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+        self._spec_proc = Popen([
+            "numactl", "-m", "1",
+            "taskset", "-c", "19",
+            "rsspectrometer",
+            "--key", DADA_KEY,
+            "--input-nchans", str(input_nchans),
+            "--fft-length", str(fft_length),
+            "--naccumulate", str(naccumulate),
+            "-o", output_file,
+            "--log-level", "info"],
+            stdout=sys.stdout, stderr=sys.stderr)
+        for ln in self._spec_proc.stdout:
+            if "RSSpectrometer instance initialised" in ln:
+                break
 
-    def abort(self):
-        pass
-
-    def deconfigure(self):
-        pass
+    def record(self):
+        log.debug("Starting mkrecv")
+        self._mkrecv_proc = Popen([
+            "numactl", "-m", "1",
+            "taskset", "-c", "10-18",
+            "mkrecv_rnt", "--header", MKRECV_CONF,
+            "--quiet"],
+            stdout=sys.stdout, stderr=sys.stderr)
+        self._spec_proc.wait()
+        self._mkrecv_proc.terminate()
 
 
 class Executor(object):
@@ -197,9 +249,7 @@ class Executor(object):
         log.info("Total number of channels: {}".format(
             total_nchans))
 
-        # spectrometer = Spectrometer()
-        # spectrometer.capture_start()
-
+        spectrometer = Spectrometer()
         frequencies = measurement.get_centre_frequencies(analysis_bandwidth)
         for frequency in frequencies:
             log.info(("Preparing for {:0.01f} measurement with "
@@ -214,20 +264,20 @@ class Executor(object):
             actual_frequency = self._interface.get_centre_frequency()
             log.info("Actual centre frequency set: {}".format(
                 str(actual_frequency)))
-
             timestamp = int(time.time() * 1000)
-
-            header_fname = "{}/{}_{:0.05}_{}.rfi".format(
+            filename_stem = "{}/{}_{:0.05}_{}".format(
                 measurement._output_path,
                 measurement._tag,
                 actual_frequency.to(u.MHz).value,
                 timestamp)
+            data_fname = "{}.bin".format(filename_stem)
+            spectrometer.configure(first_stage_nchans, fft_length, naccumulate, data_fname)
+            header_fname = "{}.rfi".format(filename_stem)
             self.write_header(header_fname, actual_frequency, sampling_rate, total_nchans,
                               actual_integration_time, timestamp, measurement._tag)
             log.info("Starting recording system")
-            #spectrometer.recording_start()
-            #time.sleep(measurement._integration_time.to(u.s).value)
-            log.info("Stopping recording system")
+            spectrometer.record()
+            log.info("Recording done")
             log.info("Measurement complete")
 
     def run_all_measurements(self):
