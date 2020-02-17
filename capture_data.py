@@ -183,7 +183,7 @@ class Executor(object):
     def write_header(self, fname, cfreq, bw, total_nchans,
                      integration_time, timestamp, tag):
         with open(fname, "w") as f:
-            print("Data: ", file=f)
+            print("Data:", file=f)
             print("Center Frequency in Hz: {}".format(cfreq.to(u.Hz).value), file=f)
             print("Bandwidth in Hz: {}".format(bw.to(u.Hz).value), file=f)
             print("Number of Channels: {}".format(total_nchans), file=f)
