@@ -55,7 +55,7 @@ measurementParameters:
     spectrometerParams:
       # These are the parameters used to configure the
       # FPGA/GPU spectrometer system.
-      resolution: 0.1
+      resolution: 2
       resolutionUnits: Hz
       # The desired frequency resolution in user defined units.
       # From this and the sampling rate (read from the analyser
