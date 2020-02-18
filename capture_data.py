@@ -30,6 +30,7 @@ class DataOutOfRangeException(Exception):
 
 class MKRECVStdoutHandler(Thread):
     def __init__(self, pipe, nskip):
+        Thread.__init__(self)
         self._pipe = pipe
         self._stop = Event()
         self._nskip = nskip
