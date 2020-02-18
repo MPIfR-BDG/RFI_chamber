@@ -32,30 +32,30 @@ class MKRECVStdoutHandler(Thread):
     def __init__(self, pipe, nskip):
         Thread.__init__(self)
         self._pipe = pipe
-        self._stop = Event()
+        self._stop_event = Event()
         self._nskip = nskip
         self.setDaemon(True)
         self.start()
 
     def stop(self):
-        self._stop.set()
+        self._stop_event.set()
         self.join()
 
     def run(self):
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             line = self._pipe.readline()
             log.debug("{}".format(line))
-            if line.startswith("STAT"):
+            if line.startswith(b"STAT"):
                 self._nskip -= 1
-            if self._nskip > 0:
-                continue
+                if self._nskip > 0:
+                    continue
                 sp = line.split()
                 total_slots = int(sp[1])
                 filled_slots = int(sp[3])
                 if total_slots != filled_slots:
                     lost_fraction = 1 - float(filled_slots) / total_slots
-                    log.warning("Packet loss detected in network capture ({:0.03f}% loss) consider restarting ".format(
-                        lost_fraction))
+                    log.warning("Packet loss detected in network capture ({:0.06f}% loss) consider repeating this measurement".format(
+                        100.0 * lost_fraction))
 
 
 class SpectrumAnalyserInterface(object):
@@ -128,11 +128,13 @@ class Measurement(object):
     def get_centre_frequencies(self, bandwidth):
         centre_freqs = []
         frequency = self._frequency_start
+        frequency = frequency + bandwidth/2
+        centre_freqs.append(frequency)
         while True:
-            frequency = frequency + bandwidth/2
-            centre_freqs.append(frequency)
-            if frequency + bandwidth/2 > self._frequency_end:
+            if frequency + bandwidth > self._frequency_end:
                 break
+            frequency = frequency + bandwidth
+            centre_freqs.append(frequency)
         return centre_freqs
 
 

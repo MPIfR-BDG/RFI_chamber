@@ -23,7 +23,7 @@ measurementParameters:
     spectrumAnalyserScpi:
       # These are the list of measurement specific SCPI
       # command to be executed prior to the meaurement
-      - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV -10"
+      - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV 0"
     frequencyRange:
       # Frequency range is defined as the complete span
       # of frequency desired in the measurement. Practically
@@ -75,7 +75,7 @@ measurementParameters:
       # The output file path where spectra will be recorded
   - userTag: MidRange_3600-600MHz_10Hz_10sec
     spectrumAnalyserScpi:
-      - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV -15"
+      - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV 0"
     frequencyRange:
       start: 3600
       end: 6000
@@ -88,7 +88,7 @@ measurementParameters:
       outputPath: /data/
   - userTag: HighRange_6000-8000MHz_1Hz_10sec
     spectrumAnalyserScpi:
-      - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV -15"
+      - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV 0"
     frequencyRange:
       start: 6000
       end: 8000
