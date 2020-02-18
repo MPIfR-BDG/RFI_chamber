@@ -50,12 +50,12 @@ measurementParameters:
       # An internal check is made to limit the span to
       # only that available from the spectrum analyser.
       start: 500
-      end: 36000
+      end: 3600
       units: MHz
     spectrometerParams:
       # These are the parameters used to configure the
       # FPGA/GPU spectrometer system.
-      resolution: 0.1
+      resolution: 2
       resolutionUnits: Hz
       # The desired frequency resolution in user defined units.
       # From this and the sampling rate (read from the analyser
@@ -64,14 +64,14 @@ measurementParameters:
       # FFT length will be rounded up to the next highest power
       # of two meaning that the output resolution will be the
       # same or finer than the desired value.
-      integrationTime: 6
+      integrationTime: 20
       integrationTimeUnits: s
       # The desired integration time in user defined units.
       # The actual integration time will be rounded to the next
       # whole number of complete output spectra (e.g. if 0.1 Hz
       # resolution is desured, the integration time will be rounded
       # up to the next multiple of 10 seconds).
-      outputPath: ./
+      outputPath: /data/ 
       # The output file path where spectra will be recorded
   - userTag: MidRange_3600-600MHz_10Hz_10sec
     spectrumAnalyserScpi:
@@ -85,7 +85,7 @@ measurementParameters:
       resolutionUnits: Hz
       integrationTime: 10
       integrationTimeUnits: s
-      outputPath: ./
+      outputPath: /data/
   - userTag: HighRange_6000-8000MHz_1Hz_10sec
     spectrumAnalyserScpi:
       - ":DISP:WIND:SUBW:TRAC:Y:SCAL:RLEV -15"
@@ -96,9 +96,9 @@ measurementParameters:
     spectrometerParams:
       resolution: 1
       resolutionUnits: Hz
-      integrationTime: 10
+      integrationTime: 20
       integrationTimeUnits: s
-      outputPath: ./
+      outputPath: /data/
 headerInformation:
   # Extra configuration information to be propagated
   # verbatim into the output *.rfi files. This content
