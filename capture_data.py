@@ -7,6 +7,7 @@ import sys
 import os
 import numpy as np
 from subprocess import Popen, PIPE
+from threading import Thread, Event
 import astropy.units as u
 
 log = logging.getLogger('capture_data')
@@ -23,6 +24,35 @@ class SpectrumAnalyserException(Exception):
 
 class DataOutOfRangeException(Exception):
     pass
+
+
+class MKRECVStdoutHandler(Thread):
+    def __init__(self, pipe, nskip):
+        self._pipe = pipe
+        self._stop = Event()
+        self._nskip = nskip
+        self.setDaemon(True)
+        self.start()
+
+    def stop(self):
+        self._stop.set()
+        self.join()
+
+    def run(self):
+        while not self._stop.is_set():
+            line = self._pipe.readline()
+            log.debug("{}".format(line))
+            if line.startswith("STAT"):
+                self._nskip -= 1
+            if self._nskip > 0:
+                continue
+                sp = line.split()
+                total_slots = int(sp[1])
+                filled_slots = int(sp[3])
+                if total_slots != filled_slots:
+                    lost_fraction = 1 - float(filled_slots) / total_slots
+                    log.warning("Packet loss detected in network capture ({:0.03f}% loss) consider restarting ".format(
+                        lost_fraction))
 
 
 class SpectrumAnalyserInterface(object):
@@ -145,6 +175,7 @@ class Spectrometer(object):
             "--input-nchans", str(input_nchans),
             "--fft-length", str(fft_length),
             "--naccumulate", str(naccumulate),
+            "--nskip", "2",
             "-o", output_file,
             "--log-level", "info"],
             stdout=sys.stdout, stderr=sys.stderr)
@@ -157,9 +188,11 @@ class Spectrometer(object):
             "taskset", "-c", "10-18",
             "mkrecv_rnt", "--header", MKRECV_CONF,
             "--quiet"],
-            stdout=sys.stdout, stderr=sys.stderr)
+            stdout=PIPE, stderr=sys.stderr)
+        mkrecv_monitor = MKRECVStdoutHandler(self._mkrecv_proc.stdout, 2)
         self._spec_proc.wait()
         self._mkrecv_proc.terminate()
+        mkrecv_monitor.stop()
 
 
 class Executor(object):
