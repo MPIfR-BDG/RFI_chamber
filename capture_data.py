@@ -254,6 +254,8 @@ class Executor(object):
 
         try:
             os.makedirs(measurement._output_path)
+        except FileExistsError:
+            pass
         except Exception as error:
             log.exception("Cannot create output directory")
             raise error
@@ -364,18 +366,25 @@ if __name__ == "__main__":
         default="INFO", help='The logging level ({})'.format(
             ", ".join(logging.getLevelName(ii) for ii in range(10, 60, 10))))
     parser.add_argument('--log-dir', metavar='DIR', type=str,
-        default=None, help='A directory to output logs to, if no directory specified logs with only go to stdout')
+        help='A directory to output logs to, if no directory specified logs with only go to stdout')
     args = parser.parse_args()
     coloredlogs.install(
         fmt="[ %(levelname)s - %(asctime)s - %(name)s - %(filename)s:%(lineno)s] %(message)s",
         level=args.log_level.upper(),
         logger=log)
 
-    if args.log_level is not None:
+    if args.log_dir is not None:
+        try:
+            os.makedirs(args.log_dir)
+        except FileExistsError:
+            pass
+        except Exception:
+            log.exception("Error while creating logging directory")
         log_file = "{}/{}".format(args.log_dir, time.strftime("%Y-%m-%dT%H:%M:%S_rfi_chamber.log"))
         fh = logging.FileHandler(log_file)
         formatter = logging.Formatter("[ %(levelname)s - %(asctime)s - %(name)s - %(filename)s:%(lineno)s] %(message)s")
         fh.setFormatter(formatter)
         log.addHandler(fh)
+        log.info("Log file: {}".format(log_file))
 
     main(args.config, args.dry_run)
