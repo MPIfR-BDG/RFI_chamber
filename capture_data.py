@@ -210,7 +210,7 @@ class Spectrometer(object):
         self._mkrecv_proc = None
         self._spec_proc = None
         self._nskip = 2
-        with open(MKRECV_FILE_PATH) as f:
+        with open(MKRECV_FILE_PATH, "w") as f:
             f.write(MKRECV_CONF)
 
     def configure(self):
