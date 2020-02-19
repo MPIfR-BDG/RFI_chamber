@@ -413,7 +413,11 @@ if __name__ == "__main__":
 
     try:
         main(args.config, args.dry_run)
+    except KeyboardInterrupt:
+        log.warning("User Ctrl-C interrupt")
     except Exception as error:
         log.error("Exception '{}' propagated to top of stack, cleaning up DADA buffers and exiting.".format(
             str(error)))
+    finally:
+        log.info("Cleaning up shared memory")
         syscmd_wrapper(["dada_db", "-k", DADA_KEY, "-d"])
