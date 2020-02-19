@@ -54,8 +54,9 @@ class MKRECVStdoutHandler(Thread):
                 filled_slots = int(sp[3])
                 if total_slots != filled_slots:
                     lost_fraction = 1 - float(filled_slots) / total_slots
-                    log.warning("Packet loss detected in network capture ({:0.06f}% loss) consider repeating this measurement".format(
-                        100.0 * lost_fraction))
+                    log.warning(("Packet loss detected in network capture ({:0.06f}% loss) "
+                                 "consider repeating this measurement").format(
+                                 100.0 * lost_fraction))
 
 
 class SpectrumAnalyserInterface(object):
@@ -251,6 +252,12 @@ class Executor(object):
 
         log.info("Output directory: {}".format(measurement._output_path))
 
+        try:
+            os.makedirs(measurement._output_path)
+        except Exception as error:
+            log.exception("Cannot create output directory")
+            raise error
+
         # Calculate the required FFT length and number of accumulated
         # spectra required to satisfy the resolution and integration
         # time.
@@ -317,7 +324,11 @@ class Executor(object):
 
     def run_all_measurements(self):
         for measurement_config in self._config["measurementParameters"]:
-            self.run_measurement(measurement_config)
+            try:
+                self.run_measurement(measurement_config)
+            except Exception as error:
+                log.error("Measurement failed with error '{}', skipping to next measurement".format(
+                    str(error)))
 
 
 def parse_config(config_file):
@@ -352,9 +363,19 @@ if __name__ == "__main__":
     parser.add_argument('--log-level', metavar='LEVEL', type=str,
         default="INFO", help='The logging level ({})'.format(
             ", ".join(logging.getLevelName(ii) for ii in range(10, 60, 10))))
+    parser.add_argument('--log-dir', metavar='DIR', type=str,
+        default=None, help='A directory to output logs to, if no directory specified logs with only go to stdout')
     args = parser.parse_args()
     coloredlogs.install(
         fmt="[ %(levelname)s - %(asctime)s - %(name)s - %(filename)s:%(lineno)s] %(message)s",
         level=args.log_level.upper(),
         logger=log)
+
+    if args.log_level is not None:
+        log_file = "{}/{}".format(args.log_dir, time.strftime("%Y-%m-%dT%H:%M:%S_rfi_chamber.log"))
+        fh = logging.FileHandler(log_file)
+        formatter = logging.Formatter("[ %(levelname)s - %(asctime)s - %(name)s - %(filename)s:%(lineno)s] %(message)s")
+        fh.setFormatter(formatter)
+        log.addHandler(fh)
+
     main(args.config, args.dry_run)
