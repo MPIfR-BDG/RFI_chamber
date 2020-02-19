@@ -10,7 +10,7 @@ setup(name='rfi_chamber',
       packages=find_packages(),
       install_requires=[
           'pyvisa',
-          'pyvisa-py'
+          'pyvisa-py',
           'pyyaml',
           'coloredlogs',
           'astropy'
