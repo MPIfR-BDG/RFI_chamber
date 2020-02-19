@@ -59,6 +59,28 @@ class MKRECVStdoutHandler(Thread):
                                  100.0 * lost_fraction))
 
 
+class RSSpectrometerStdoutHandler(Thread):
+    def __init__(self, pipe):
+        Thread.__init__(self)
+        self._pipe = pipe
+        self._stop_event = Event()
+        self.setDaemon(True)
+        self.start()
+
+    def stop(self):
+        self._stop_event.set()
+        self.join()
+
+    def run(self):
+        while not self._stop_event.is_set():
+            line = self._pipe.readline()
+            log.debug("{}".format(line))
+            if b"[info]" in line:
+                log.info(line)
+            elif b"[error]" in line:
+                log.error(line)
+
+
 class SpectrumAnalyserInterface(object):
     def __init__(self, visa_resource, passive=False):
         self._visa_resource = visa_resource
@@ -186,7 +208,7 @@ class Spectrometer(object):
             "--nskip", str(self._nskip),
             "-o", output_file,
             "--log-level", "info"],
-            stdout=sys.stdout, stderr=sys.stderr)
+            stdout=PIPE, stderr=sys.stderr)
         log.debug("Starting mkrecv")
         self._mkrecv_proc = Popen([
             "numactl", "-m", "1",
@@ -195,9 +217,11 @@ class Spectrometer(object):
             "--quiet"],
             stdout=PIPE, stderr=sys.stderr)
         mkrecv_monitor = MKRECVStdoutHandler(self._mkrecv_proc.stdout, self._nskip)
+        rs_monitor = RSSpectrometerStdoutHandler(self._spec_proc.stdout)
         self._spec_proc.wait()
         self._mkrecv_proc.terminate()
         mkrecv_monitor.stop()
+        rs_monitor.stop()
 
 
 class Executor(object):
