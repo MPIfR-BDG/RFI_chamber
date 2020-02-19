@@ -76,9 +76,9 @@ class RSSpectrometerStdoutHandler(Thread):
             line = self._pipe.readline()
             log.debug("{}".format(line))
             if b"[info]" in line:
-                log.info(line)
+                log.info(line.decode().strip("\n"))
             elif b"[error]" in line:
-                log.error(line)
+                log.error(line.decode().strip("\n"))
 
 
 class SpectrumAnalyserInterface(object):
