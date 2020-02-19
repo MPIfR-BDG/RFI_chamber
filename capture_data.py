@@ -131,7 +131,7 @@ class Measurement(object):
         frequency = frequency + bandwidth/2
         centre_freqs.append(frequency)
         while True:
-            if frequency + bandwidth > self._frequency_end:
+            if frequency + bandwidth/2 > self._frequency_end:
                 break
             frequency = frequency + bandwidth
             centre_freqs.append(frequency)
@@ -151,9 +151,9 @@ class Spectrometer(object):
     def __init__(self):
         self._mkrecv_proc = None
         self._spec_proc = None
+        self._nskip = 2
 
-    def configure(
-        self, input_nchans, fft_length, naccumulate, output_file):
+    def configure(self):
         # Destroy any previous DADA buffers
         log.debug("Cleaning up any previous DADA buffers")
         try:
@@ -168,8 +168,10 @@ class Spectrometer(object):
                         "-b", str(DADA_BLOCK_SIZE),
                         "-n", str(DADA_NBLOCKS),
                         "-l", "-p"])
-        # Here we would start the spectrometer
-        # and attach it to the DADA buffer
+
+    def record(self, input_nchans, fft_length, naccumulate, output_file):
+        log.debug("Reseting DADA buffer")
+        syscmd_wrapper(["dbreset", "-k", DADA_KEY])
         log.debug("Starting spectrometer")
         os.environ["CUDA_VISIBLE_DEVICES"] = "1"
         self._spec_proc = Popen([
@@ -180,13 +182,10 @@ class Spectrometer(object):
             "--input-nchans", str(input_nchans),
             "--fft-length", str(fft_length),
             "--naccumulate", str(naccumulate),
-            "--nskip", "2",
+            "--nskip", str(self._nskip),
             "-o", output_file,
             "--log-level", "info"],
             stdout=sys.stdout, stderr=sys.stderr)
-        time.sleep(10)
-
-    def record(self):
         log.debug("Starting mkrecv")
         self._mkrecv_proc = Popen([
             "numactl", "-m", "1",
@@ -194,7 +193,7 @@ class Spectrometer(object):
             "mkrecv_rnt", "--header", MKRECV_CONF,
             "--quiet"],
             stdout=PIPE, stderr=sys.stderr)
-        mkrecv_monitor = MKRECVStdoutHandler(self._mkrecv_proc.stdout, 2)
+        mkrecv_monitor = MKRECVStdoutHandler(self._mkrecv_proc.stdout, self._nskip)
         self._spec_proc.wait()
         self._mkrecv_proc.terminate()
         mkrecv_monitor.stop()
@@ -286,6 +285,7 @@ class Executor(object):
             total_nchans))
 
         spectrometer = Spectrometer()
+        spectrometer.configure()
         frequencies = measurement.get_centre_frequencies(analysis_bandwidth)
         for frequency in frequencies:
             log.info(("Preparing for {:0.01f} measurement with "
@@ -307,12 +307,11 @@ class Executor(object):
                 actual_frequency.to(u.MHz).value,
                 timestamp)
             data_fname = "{}.bin".format(filename_stem)
-            spectrometer.configure(first_stage_nchans, fft_length, naccumulate, data_fname)
             header_fname = "{}.rfi".format(filename_stem)
             self.write_header(header_fname, actual_frequency, sampling_rate, total_nchans,
                               actual_integration_time, timestamp, measurement._tag)
             log.info("Starting recording system")
-            spectrometer.record()
+            spectrometer.record(first_stage_nchans, fft_length, naccumulate, data_fname)
             log.info("Recording done")
             log.info("Measurement complete")
 
@@ -325,7 +324,7 @@ def parse_config(config_file):
     log.info("Parsing configuration from file: {}".format(config_file))
     with open(config_file, "r") as f:
         try:
-            config = yaml.load(f)
+            config = yaml.full_load(f)
         except Exception as error:
             log.exception("Error during configuration file load")
             raise error
