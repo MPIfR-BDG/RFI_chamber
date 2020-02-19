@@ -411,4 +411,9 @@ if __name__ == "__main__":
         log.addHandler(fh)
         log.info("Log file: {}".format(log_file))
 
-    main(args.config, args.dry_run)
+    try:
+        main(args.config, args.dry_run)
+    except Exception as error:
+        log.error("Exception '{}' propagated to top of stack, cleaning up DADA buffers and exiting.".format(
+            str(error)))
+        syscmd_wrapper(["dada_db", "-k", DADA_KEY, "-d"])
