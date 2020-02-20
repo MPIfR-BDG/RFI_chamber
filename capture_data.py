@@ -376,7 +376,7 @@ class Executor(object):
                 measurement._tag,
                 actual_frequency.to(u.MHz).value,
                 timestamp)
-            data_fname = "{}.bin".format(filename_stem)
+            data_fname = "{}.npy".format(filename_stem)
             header_fname = "{}.rfi".format(filename_stem)
             self.write_header(header_fname, actual_frequency, sampling_rate, total_nchans,
                               actual_integration_time, timestamp, measurement._tag)
