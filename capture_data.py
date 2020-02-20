@@ -245,14 +245,14 @@ class Spectrometer(object):
             "--nskip", str(self._nskip),
             "-o", output_file,
             "--log-level", "info"],
-            stdout=PIPE, stderr=sys.stderr)
+            stdout=PIPE, stderr=sys.stderr, bufsize=1)
         log.debug("Starting mkrecv")
         self._mkrecv_proc = Popen([
             "numactl", "-m", "1",
             "taskset", "-c", "10-18",
             "mkrecv_rnt", "--header", MKRECV_FILE_PATH,
             "--quiet"],
-            stdout=PIPE, stderr=sys.stderr)
+            stdout=PIPE, stderr=sys.stderr, bufsize=1)
         mkrecv_monitor = MKRECVStdoutHandler(self._mkrecv_proc.stdout, self._nskip)
         rs_monitor = RSSpectrometerStdoutHandler(self._spec_proc.stdout)
         self._spec_proc.wait()
@@ -427,7 +427,7 @@ if __name__ == "__main__":
         default="INFO", help='The logging level ({})'.format(
             ", ".join(logging.getLevelName(ii) for ii in range(10, 60, 10))))
     parser.add_argument('--log-dir', metavar='DIR', type=str,
-        help='A directory to output logs to, if no directory specified logs with only go to stdout')
+        help='A directory to output logs to, if no directory is specified logs will only go to stdout')
     args = parser.parse_args()
     coloredlogs.install(
         fmt="[ %(levelname)s - %(asctime)s - %(name)s - %(filename)s:%(lineno)s] %(message)s",
