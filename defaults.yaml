@@ -99,27 +99,6 @@ measurementParameters:
       integrationTime: 20
       integrationTimeUnits: s
       outputPath: /data/
-
-  "Filetype": "MPIfR RFI file",
-  "Instiute" : "MPIfR",
-  "Center Frequency in Hz": 704800000.0,
-  "Bandwidth in Hz": 512000000.0,
-  "Number of Channels": 268435456,
-  "Frequency Spacing": "uniform",
-  "Integration time in milliseconds": 20447.232,
-  "Unique Scan ID": 1582036379325,
-  "Timestamp": 1582036379325,
-  "User Friendly Name": "LowRange_500-3600MHz_100Hz_6sec",
-  "Data Acquisition System" : "Spectromonster",
-  "Chamber Calibration": "CCF_20190521.csv",
-  "Antenna Calibration": "default",
-  "Cable Calibration": "default",
-  "LNA Calibration": "GainLNACable-20190521.csv",
-  "Background Data": "unknown",
-  "DUT comments": "NO COMMENTS",
-  "Chamber Type": "anechoic"
-}
-
 headerInformation:
   # Extra configuration information to be propagated
   # verbatim into the output *.rfi files. This content
