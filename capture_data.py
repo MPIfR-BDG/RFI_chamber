@@ -7,6 +7,7 @@ import yaml
 import coloredlogs
 import sys
 import os
+import json
 import numpy as np
 from subprocess import Popen, PIPE
 from threading import Thread, Event
@@ -55,6 +56,7 @@ IDX2_ITEM   2
 IDX2_LIST   0:16
 """
 
+
 class SpectrumAnalyserException(Exception):
     pass
 
@@ -63,38 +65,7 @@ class DataOutOfRangeException(Exception):
     pass
 
 
-class MKRECVStdoutHandler(Thread):
-    def __init__(self, pipe, nskip):
-        Thread.__init__(self)
-        self._pipe = pipe
-        self._stop_event = Event()
-        self._nskip = nskip
-        self.setDaemon(True)
-        self.start()
-
-    def stop(self):
-        self._stop_event.set()
-        self.join()
-
-    def run(self):
-        while not self._stop_event.is_set():
-            line = self._pipe.readline()
-            log.debug("{}".format(line))
-            if line.startswith(b"STAT"):
-                self._nskip -= 1
-                if self._nskip > 0:
-                    continue
-                sp = line.split()
-                total_slots = int(sp[1])
-                filled_slots = int(sp[3])
-                if total_slots != filled_slots:
-                    lost_fraction = 1 - float(filled_slots) / total_slots
-                    log.warning(("Packet loss detected in network capture ({:0.06f}% loss) "
-                                 "consider repeating this measurement").format(
-                                 100.0 * lost_fraction))
-
-
-class RSSpectrometerStdoutHandler(Thread):
+class PipeHandler(Thread):
     def __init__(self, pipe):
         Thread.__init__(self)
         self._pipe = pipe
@@ -105,6 +76,38 @@ class RSSpectrometerStdoutHandler(Thread):
     def stop(self):
         self._stop_event.set()
         self.join()
+
+
+class MKRECVStdoutHandler(PipeHandler):
+    def __init__(self, pipe, nskip):
+        self._nskip = nskip
+        PipeHandler.__init__(self, pipe)
+
+    def parse_stat_line(self, line):
+        sp = line.split()
+        total_slots = int(sp[1])
+        filled_slots = int(sp[3])
+        if total_slots != filled_slots:
+            lost_fraction = 1 - float(filled_slots) / total_slots
+            log.warning(("Packet loss detected in network capture ({:0.06f}% loss) "
+                         "consider repeating this measurement").format(
+                         100.0 * lost_fraction))
+
+    def run(self):
+        while not self._stop_event.is_set():
+            line = self._pipe.readline()
+            log.debug("{}".format(line))
+            if line.startswith(b"STAT"):
+                self._nskip -= 1
+                if self._nskip > 0:
+                    continue
+                else:
+                    self.parse_stat_line(line)
+
+
+class RSSpectrometerStdoutHandler(PipeHandler):
+    def __init__(self, pipe):
+        PipeHandler.__init__(self, pipe)
 
     def run(self):
         while not self._stop_event.is_set():
@@ -281,18 +284,20 @@ class Executor(object):
 
     def write_header(self, fname, cfreq, bw, total_nchans,
                      integration_time, timestamp, tag):
+        header_dict = {
+            "Center Frequency in Hz": cfreq.to(u.Hz).value,
+            "Bandwidth in Hz": bw.to(u.Hz).value,
+            "Number of Channels": total_nchans,
+            "Frequency Spacing": "uniform",
+            "Integration time in milliseconds": integration_time.to(u.ms).value,
+            "Unique Scan ID": timestamp,
+            "Timestamp": timestamp,
+            "User Friendly Name": tag
+        }
+        for param in self._config["headerInformation"]:
+            header_dict[param["key"]] = param["value"]
         with open(fname, "w") as f:
-            print("Data:", file=f)
-            print("Center Frequency in Hz: {}".format(cfreq.to(u.Hz).value), file=f)
-            print("Bandwidth in Hz: {}".format(bw.to(u.Hz).value), file=f)
-            print("Number of Channels: {}".format(total_nchans), file=f)
-            print("Frequency Spacing: uniform", file=f)
-            print("Integration time in milliseconds: {}".format(integration_time.to(u.ms).value), file=f)
-            print("Unique Scan ID: {}".format(timestamp), file=f)
-            print("Timestamp: {}".format(timestamp), file=f)
-            print("User Friendly Name: {}".format(tag), file=f)
-            for param in self._config["headerInformation"]:
-                print(param, file=f)
+            json.dump(f, header_dict)
 
     def run_measurement(self, mconfig):
         measurement = Measurement(mconfig)
