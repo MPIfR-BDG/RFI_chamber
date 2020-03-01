@@ -297,7 +297,7 @@ class Executor(object):
         for param in self._config["headerInformation"]:
             header_dict[param["key"]] = param["value"]
         with open(fname, "w") as f:
-            json.dump(f, header_dict)
+            json.dump(header_dict, f)
 
     def run_measurement(self, mconfig):
         measurement = Measurement(mconfig)
