@@ -71,7 +71,7 @@ measurementParameters:
       # whole number of complete output spectra (e.g. if 0.1 Hz
       # resolution is desured, the integration time will be rounded
       # up to the next multiple of 10 seconds).
-      outputPath: /data/ 
+      outputPath: /data/
       # The output file path where spectra will be recorded
   - userTag: MidRange_3600-600MHz_10Hz_10sec
     spectrumAnalyserScpi:
@@ -99,18 +99,50 @@ measurementParameters:
       integrationTime: 20
       integrationTimeUnits: s
       outputPath: /data/
+
+  "Filetype": "MPIfR RFI file",
+  "Instiute" : "MPIfR",
+  "Center Frequency in Hz": 704800000.0,
+  "Bandwidth in Hz": 512000000.0,
+  "Number of Channels": 268435456,
+  "Frequency Spacing": "uniform",
+  "Integration time in milliseconds": 20447.232,
+  "Unique Scan ID": 1582036379325,
+  "Timestamp": 1582036379325,
+  "User Friendly Name": "LowRange_500-3600MHz_100Hz_6sec",
+  "Data Acquisition System" : "Spectromonster",
+  "Chamber Calibration": "CCF_20190521.csv",
+  "Antenna Calibration": "default",
+  "Cable Calibration": "default",
+  "LNA Calibration": "GainLNACable-20190521.csv",
+  "Background Data": "unknown",
+  "DUT comments": "NO COMMENTS",
+  "Chamber Type": "anechoic"
+}
+
 headerInformation:
   # Extra configuration information to be propagated
   # verbatim into the output *.rfi files. This content
   # is completely user defined.
-  - "Data Acquisition System: Spectromonster"
-  - "Chamber Calibration: default"
-  - "Antenna Calibration: default"
-  - "Cable Calibration: default"
-  - "LNA Calibration: default"
-  - "Background Data: unknown"
+  - key: "Filetype"
+    value: "MPIfR RFI file"
+  - key: "MPIfR"
+    value: "Spectromonster"
+  - key: "Data Acquisition System"
+    value: "Spectromonster"
+  - key: "Chamber Calibration"
+    value: "default"
+  - key: "Antenna Calibration"
+    value: "default"
+  - key: "Cable Calibration"
+    value: "default"
+  - key: "LNA Calibration"
+    value: "default"
+  - key: "Background Data"
+    value: "unknown"
   # chamber type reverb | anechoic | freespace | test ?
-  - "Chamber Type: reverb"
+  - key: "Chamber Type"
+    value: "reverb"
 
 
 
