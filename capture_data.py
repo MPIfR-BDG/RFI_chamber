@@ -245,7 +245,7 @@ class Spectrometer(object):
             "--nskip", str(self._nskip),
             "-o", output_file,
             "--log-level", "info"],
-            stdout=PIPE, stderr=sys.stderr, bufsize=1)
+            stdout=sys.stdout, stderr=sys.stderr, bufsize=1)
         log.debug("Starting mkrecv")
         self._mkrecv_proc = Popen([
             "numactl", "-m", "1",
@@ -254,11 +254,11 @@ class Spectrometer(object):
             "--quiet"],
             stdout=PIPE, stderr=sys.stderr, bufsize=1)
         mkrecv_monitor = MKRECVStdoutHandler(self._mkrecv_proc.stdout, self._nskip)
-        rs_monitor = RSSpectrometerStdoutHandler(self._spec_proc.stdout)
+        #rs_monitor = RSSpectrometerStdoutHandler(self._spec_proc.stdout)
         self._spec_proc.wait()
         self._mkrecv_proc.terminate()
         mkrecv_monitor.stop()
-        rs_monitor.stop()
+        #rs_monitor.stop()
 
 
 class Executor(object):
@@ -457,4 +457,7 @@ if __name__ == "__main__":
             str(error)))
     finally:
         log.info("Cleaning up shared memory")
-        syscmd_wrapper(["dada_db", "-k", DADA_KEY, "-d"])
+        try:
+            syscmd_wrapper(["dada_db", "-k", DADA_KEY, "-d"])
+        except: 
+            pass
