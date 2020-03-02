@@ -505,3 +505,9 @@ if __name__ == "__main__":
             syscmd_wrapper(["dada_db", "-k", DADA_KEY, "-d"])
         except:
             pass
+        log.info("Cleaning up any hanging capture instances")
+        try:
+            syscmd_wrapper(["pkill", "--signal", "9", "mkrecv_rnt"])
+            syscmd_wrapper(["pkill", "--signal", "9", "rsspectrometer"])
+        except:
+            pass
