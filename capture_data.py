@@ -19,7 +19,7 @@ DADA_BLOCK_SIZE = 8589934592
 DADA_NBLOCKS = 6
 DADA_KEY = "dada"
 MKRECV_FILE_PATH = "/tmp/mkrecv.cfg"
-MKRECV_CONF = """
+MKRECV_CONF_PFB_MODE = """
 HEADER       DADA                # Distributed aquisition and data analysis
 HDR_VERSION  1.0                 # Version of this ASCII header
 HDR_SIZE     4096                # Size of the header in bytes
@@ -54,6 +54,40 @@ IDX1_STEP   1   # The difference between successive timestamps
 # The second index item distinguish between both polarizations
 IDX2_ITEM   2
 IDX2_LIST   0:16
+"""
+
+MKRECV_CONF_PASSTHROUGH_MODE = """
+HEADER       DADA                # Distributed aquisition and data analysis
+HDR_VERSION  1.0                 # Version of this ASCII header
+HDR_SIZE     4096                # Size of the header in bytes
+DADA_VERSION 1.0                 # Version of the DADA Software
+
+# time of the rising edge of the first time sample
+UTC_START    unset               # yyyy-mm-dd-hh:mm:ss.fs
+MJD_START    unset               # MJD equivalent to the start UTC
+
+#MeerKAT specifics
+DADA_KEY     dada
+SYNC_TIME    1231235243.0000000
+SAMPLE_CLOCK 1750000000.0
+MCAST_SOURCES 225.0.0.100+15 #,225.0.0.153,225.0.0.154,225.0.0.155
+PORT         7148
+#UDP_IF       10.10.1.11
+IBV_IF      192.168.2.81
+IBV_VECTOR   -1
+IBV_MAX_POLL 10
+#SAMPLE_CLOCK_START 0
+HEAP_NBYTES 8192
+PACKET_SIZE 9000
+BUFFER_SIZE 128000000
+DADA_NSLOTS 4
+NTHREADS 9
+
+#MeerKat F-Engine
+NINDICES    1
+# The first index item is the running timestamp
+IDX1_ITEM   0         # First item of a SPEAD heap
+IDX1_STEP   1   # The difference between successive timestamps
 """
 
 
@@ -209,12 +243,10 @@ def syscmd_wrapper(cmd):
 
 
 class Spectrometer(object):
-    def __init__(self):
+    def __init__(self, mode):
         self._mkrecv_proc = None
         self._spec_proc = None
         self._nskip = 2
-        with open(MKRECV_FILE_PATH, "w") as f:
-            f.write(MKRECV_CONF)
 
     def configure(self):
         # Destroy any previous DADA buffers
@@ -233,6 +265,14 @@ class Spectrometer(object):
                         "-l", "-p"])
 
     def record(self, input_nchans, fft_length, naccumulate, output_file):
+        log.debug("Writing MKRECV header file")
+        with open(MKRECV_FILE_PATH, "w") as f:
+            if input_nchans == 1:
+                log.info("Assuming PASSTHROUGH mode on FPGA")
+                f.write(MKRECV_CONF_PASSTHROUGH_MODE)
+            else:
+                log.info("Assuming PFB mode on FPGA")
+                f.write(MKRECV_CONF_PFB_MODE)
         log.debug("Reseting DADA buffer")
         syscmd_wrapper(["dbreset", "-k", DADA_KEY])
         log.debug("Starting spectrometer")
@@ -464,5 +504,5 @@ if __name__ == "__main__":
         log.info("Cleaning up shared memory")
         try:
             syscmd_wrapper(["dada_db", "-k", DADA_KEY, "-d"])
-        except: 
+        except:
             pass
