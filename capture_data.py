@@ -14,7 +14,6 @@ from threading import Thread, Event
 import astropy.units as u
 
 log = logging.getLogger('capture_data')
-
 DADA_BLOCK_SIZE = 8589934592
 DADA_NBLOCKS = 6
 DADA_KEY = "dada"
@@ -243,7 +242,7 @@ def syscmd_wrapper(cmd):
 
 
 class Spectrometer(object):
-    def __init__(self, mode):
+    def __init__(self):
         self._mkrecv_proc = None
         self._spec_proc = None
         self._nskip = 2
