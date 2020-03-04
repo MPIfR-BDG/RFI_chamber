@@ -122,7 +122,3 @@ headerInformation:
   # chamber type reverb | anechoic | freespace | test ?
   - key: "Chamber Type"
     value: "reverb"
-
-
-
-

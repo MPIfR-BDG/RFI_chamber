@@ -14,6 +14,7 @@ from threading import Thread, Event
 import astropy.units as u
 
 log = logging.getLogger('capture_data')
+MAX_FFT_LENGTH = 1<<28
 DADA_BLOCK_SIZE = 8589934592
 DADA_NBLOCKS = 6
 DADA_KEY = "dada"
@@ -35,7 +36,7 @@ SAMPLE_CLOCK 1750000000.0
 MCAST_SOURCES 225.0.0.100+15 #,225.0.0.153,225.0.0.154,225.0.0.155
 PORT         7148
 #UDP_IF       10.10.1.11
-IBV_IF      192.168.2.81
+IBV_IF      192.168.2.80
 IBV_VECTOR   -1
 IBV_MAX_POLL 10
 #SAMPLE_CLOCK_START 0
@@ -72,7 +73,7 @@ SAMPLE_CLOCK 1750000000.0
 MCAST_SOURCES 225.0.0.100+15 #,225.0.0.153,225.0.0.154,225.0.0.155
 PORT         7148
 #UDP_IF       10.10.1.11
-IBV_IF      192.168.2.81
+IBV_IF      192.168.2.80
 IBV_VECTOR   -1
 IBV_MAX_POLL 10
 #SAMPLE_CLOCK_START 0
@@ -275,10 +276,10 @@ class Spectrometer(object):
         log.debug("Reseting DADA buffer")
         syscmd_wrapper(["dbreset", "-k", DADA_KEY])
         log.debug("Starting spectrometer")
-        os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+        #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
         self._spec_proc = Popen([
-            "numactl", "-m", "1",
-            "taskset", "-c", "19",
+            #"numactl", "-m", "1",
+            "taskset", "-c", "9",
             "rsspectrometer",
             "--key", DADA_KEY,
             "--input-nchans", str(input_nchans),
@@ -290,8 +291,8 @@ class Spectrometer(object):
             stdout=sys.stdout, stderr=sys.stderr, bufsize=1)
         log.debug("Starting mkrecv")
         self._mkrecv_proc = Popen([
-            "numactl", "-m", "1",
-            "taskset", "-c", "10-18",
+            #"numactl", "-m", "1",
+            "taskset", "-c", "0-8",
             "mkrecv_rnt", "--header", MKRECV_FILE_PATH,
             "--quiet"],
             stdout=PIPE, stderr=sys.stderr, bufsize=1)
@@ -379,6 +380,11 @@ class Executor(object):
             measurement._resolution).decompose().value)
         # Round FFT length to next power of 2
         fft_length = 2**((fft_length-1).bit_length())
+        if fft_length > MAX_FFT_LENGTH:
+            message = "Resolution exceeds maximum FFT length ({} pts)".format(MAX_FFT_LENGTH)
+            log.error(message)
+            raise Exception(message)
+        
         log.info("Desired second stage channeliser frequency resolution: {}".format(
             measurement._resolution))
         log.info("Second stage channeliser Nchans: {}".format(
