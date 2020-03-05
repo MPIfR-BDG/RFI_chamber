@@ -330,7 +330,7 @@ class Executor(object):
             "Number of Channels": total_nchans,
             "Frequency Spacing": "uniform",
             "Integration time in milliseconds": integration_time.to(u.ms).value,
-            "Unique Scan ID": timestamp,
+            "Unique Scan ID": fname.strip(".rfi"),
             "Timestamp": timestamp,
             "User Friendly Name": tag
         }
