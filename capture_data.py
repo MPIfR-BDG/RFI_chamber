@@ -16,7 +16,7 @@ import astropy.units as u
 log = logging.getLogger('capture_data')
 MAX_FFT_LENGTH = 1<<28
 DADA_BLOCK_SIZE = 8589934592
-DADA_NBLOCKS = 6
+DADA_NBLOCKS = 8
 DADA_KEY = "dada"
 MKRECV_FILE_PATH = "/tmp/mkrecv.cfg"
 MKRECV_CONF_PFB_MODE = """
@@ -36,7 +36,7 @@ SAMPLE_CLOCK 1750000000.0
 MCAST_SOURCES 225.0.0.100+15 #,225.0.0.153,225.0.0.154,225.0.0.155
 PORT         7148
 #UDP_IF       10.10.1.11
-IBV_IF      192.168.2.80
+IBV_IF      192.168.2.81
 IBV_VECTOR   -1
 IBV_MAX_POLL 10
 #SAMPLE_CLOCK_START 0
@@ -73,7 +73,7 @@ SAMPLE_CLOCK 1750000000.0
 MCAST_SOURCES 225.0.0.100+15 #,225.0.0.153,225.0.0.154,225.0.0.155
 PORT         7148
 #UDP_IF       10.10.1.11
-IBV_IF      192.168.2.80
+IBV_IF      192.168.2.81
 IBV_VECTOR   -1
 IBV_MAX_POLL 10
 #SAMPLE_CLOCK_START 0
@@ -249,22 +249,25 @@ class Spectrometer(object):
         self._nskip = 2
 
     def configure(self):
+        """
         # Destroy any previous DADA buffers
         log.debug("Cleaning up any previous DADA buffers")
         try:
-            syscmd_wrapper(["dada_db", "-k", DADA_KEY, "-d"])
+            syscmd_wrapper(["taskset", "-c", "0-8", "dada_db", "-k", DADA_KEY, "-d"])
         except Exception as e:
             pass
 
         # Create new DADA buffer
         log.debug("Allocating DADA buffer")
-        syscmd_wrapper(["dada_db",
+        syscmd_wrapper(["taskset", "-c", "0-8", "dada_db",
                         "-k", DADA_KEY,
                         "-b", str(DADA_BLOCK_SIZE),
                         "-n", str(DADA_NBLOCKS),
                         "-l", "-p"])
+        """
+        pass
 
-    def record(self, input_nchans, fft_length, naccumulate, output_file):
+    def record(self, input_nchans, fft_length, naccumulate, output_file, reference_level):
         log.debug("Writing MKRECV header file")
         with open(MKRECV_FILE_PATH, "w") as f:
             if input_nchans == 1:
@@ -273,26 +276,46 @@ class Spectrometer(object):
             else:
                 log.info("Assuming PFB mode on FPGA")
                 f.write(MKRECV_CONF_PFB_MODE)
-        log.debug("Reseting DADA buffer")
-        syscmd_wrapper(["dbreset", "-k", DADA_KEY])
+        #log.debug("Reseting DADA buffer")
+        #syscmd_wrapper(["dbreset", "-k", DADA_KEY])
+        
+        # Destroy any previous DADA buffers
+        log.debug("Cleaning up any previous DADA buffers")
+        try:
+            syscmd_wrapper(["taskset", "-c", "10-19", "dada_db", "-k", DADA_KEY, "-d"])
+        except Exception as e:
+            pass
+
+        # Create new DADA buffer
+        log.debug("Allocating DADA buffer")
+        syscmd_wrapper(["taskset", "-c", "10-19", "dada_db",
+                        "-k", DADA_KEY,
+                        "-b", str(DADA_BLOCK_SIZE),
+                        "-n", str(DADA_NBLOCKS),
+                        "-l", "-p"])
+        
         log.debug("Starting spectrometer")
-        #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+        os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+        
         self._spec_proc = Popen([
-            #"numactl", "-m", "1",
-            "taskset", "-c", "9",
+            "numactl", "-m", "1",
+            "taskset", "-c", "19",
             "rsspectrometer",
             "--key", DADA_KEY,
             "--input-nchans", str(input_nchans),
             "--fft-length", str(fft_length),
             "--naccumulate", str(naccumulate),
+            "--reflevel", str(reference_level.value),
             "--nskip", str(self._nskip),
             "-o", output_file,
             "--log-level", "info"],
             stdout=sys.stdout, stderr=sys.stderr, bufsize=1)
+        
+        #self._spec_proc = Popen(["dbnull"])
         log.debug("Starting mkrecv")
         self._mkrecv_proc = Popen([
-            #"numactl", "-m", "1",
-            "taskset", "-c", "0-8",
+            "numactl", "-m", "1",
+            "taskset", "-c", "10-18",
             "mkrecv_rnt", "--header", MKRECV_FILE_PATH,
             "--quiet"],
             stdout=PIPE, stderr=sys.stderr, bufsize=1)
@@ -330,7 +353,7 @@ class Executor(object):
             "Number of Channels": total_nchans,
             "Frequency Spacing": "uniform",
             "Integration time in milliseconds": integration_time.to(u.ms).value,
-            "Unique Scan ID": fname.strip(".rfi"),
+            "Unique Scan ID": fname.split("/")[-1].strip(".rfi"),
             "Timestamp": timestamp,
             "User Friendly Name": tag
         }
@@ -431,7 +454,7 @@ class Executor(object):
             self.write_header(header_fname, actual_frequency, sampling_rate, total_nchans,
                               actual_integration_time, timestamp, measurement._tag)
             log.info("Starting recording system")
-            spectrometer.record(first_stage_nchans, fft_length, naccumulate, data_fname)
+            spectrometer.record(first_stage_nchans, fft_length, naccumulate, data_fname, scaling_level)
             log.info("Recording done")
             log.info("Measurement complete")
 
