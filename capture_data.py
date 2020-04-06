@@ -15,8 +15,8 @@ import astropy.units as u
 
 log = logging.getLogger('capture_data')
 MAX_FFT_LENGTH = 1<<28
-DADA_BLOCK_SIZE = 8589934592
-DADA_NBLOCKS = 8
+DADA_BLOCK_SIZE = 1073741824#8589934592
+DADA_NBLOCKS = 12
 DADA_KEY = "dada"
 MKRECV_FILE_PATH = "/tmp/mkrecv.cfg"
 MKRECV_CONF_PFB_MODE = """
@@ -73,7 +73,7 @@ SAMPLE_CLOCK 1750000000.0
 MCAST_SOURCES 225.0.0.100+15 #,225.0.0.153,225.0.0.154,225.0.0.155
 PORT         7148
 #UDP_IF       10.10.1.11
-IBV_IF      192.168.2.81
+IBV_IF       192.168.2.81 
 IBV_VECTOR   -1
 IBV_MAX_POLL 10
 #SAMPLE_CLOCK_START 0
@@ -246,39 +246,10 @@ class Spectrometer(object):
     def __init__(self):
         self._mkrecv_proc = None
         self._spec_proc = None
-        self._nskip = 2
+        self._nskip = 4
 
     def configure(self):
         """
-        # Destroy any previous DADA buffers
-        log.debug("Cleaning up any previous DADA buffers")
-        try:
-            syscmd_wrapper(["taskset", "-c", "0-8", "dada_db", "-k", DADA_KEY, "-d"])
-        except Exception as e:
-            pass
-
-        # Create new DADA buffer
-        log.debug("Allocating DADA buffer")
-        syscmd_wrapper(["taskset", "-c", "0-8", "dada_db",
-                        "-k", DADA_KEY,
-                        "-b", str(DADA_BLOCK_SIZE),
-                        "-n", str(DADA_NBLOCKS),
-                        "-l", "-p"])
-        """
-        pass
-
-    def record(self, input_nchans, fft_length, naccumulate, output_file, reference_level):
-        log.debug("Writing MKRECV header file")
-        with open(MKRECV_FILE_PATH, "w") as f:
-            if input_nchans == 1:
-                log.info("Assuming PASSTHROUGH mode on FPGA")
-                f.write(MKRECV_CONF_PASSTHROUGH_MODE)
-            else:
-                log.info("Assuming PFB mode on FPGA")
-                f.write(MKRECV_CONF_PFB_MODE)
-        #log.debug("Reseting DADA buffer")
-        #syscmd_wrapper(["dbreset", "-k", DADA_KEY])
-        
         # Destroy any previous DADA buffers
         log.debug("Cleaning up any previous DADA buffers")
         try:
@@ -293,13 +264,42 @@ class Spectrometer(object):
                         "-b", str(DADA_BLOCK_SIZE),
                         "-n", str(DADA_NBLOCKS),
                         "-l", "-p"])
+        """
+        
+
+    def record(self, input_nchans, fft_length, naccumulate, output_file, reference_level):
+        log.debug("Writing MKRECV header file")
+        with open(MKRECV_FILE_PATH, "w") as f:
+            if input_nchans == 1:
+                log.info("Assuming PASSTHROUGH mode on FPGA")
+                f.write(MKRECV_CONF_PASSTHROUGH_MODE)
+            else:
+                log.info("Assuming PFB mode on FPGA")
+                f.write(MKRECV_CONF_PFB_MODE)
+        #log.debug("Reseting DADA buffer")
+        #syscmd_wrapper(["taskset", "-c", "10-19", "dbreset", "-k", DADA_KEY])
+        
+        
+        # Destroy any previous DADA buffers
+        log.debug("Cleaning up any previous DADA buffers")
+        try:
+            syscmd_wrapper(["taskset", "-c", "0-9", "dada_db", "-k", DADA_KEY, "-d"])
+        except Exception as e:
+            pass
+
+        # Create new DADA buffer
+        log.debug("Allocating DADA buffer")
+        syscmd_wrapper(["taskset", "-c", "0-9", "dada_db",
+                        "-k", DADA_KEY,
+                        "-b", str(DADA_BLOCK_SIZE),
+                        "-n", str(DADA_NBLOCKS),
+                        "-l", "-p"])
         
         log.debug("Starting spectrometer")
-        os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
         
         self._spec_proc = Popen([
-            "numactl", "-m", "1",
-            "taskset", "-c", "19",
+            "taskset", "-c", "9",
             "rsspectrometer",
             "--key", DADA_KEY,
             "--input-nchans", str(input_nchans),
@@ -314,10 +314,9 @@ class Spectrometer(object):
         #self._spec_proc = Popen(["dbnull"])
         log.debug("Starting mkrecv")
         self._mkrecv_proc = Popen([
-            "numactl", "-m", "1",
-            "taskset", "-c", "10-18",
+            "taskset", "-c", "0-8",
             "mkrecv_rnt", "--header", MKRECV_FILE_PATH,
-            "--quiet"],
+            "--slots-skip","4","--quiet"],
             stdout=PIPE, stderr=sys.stderr, bufsize=1)
         mkrecv_monitor = MKRECVStdoutHandler(self._mkrecv_proc.stdout, self._nskip)
         #rs_monitor = RSSpectrometerStdoutHandler(self._spec_proc.stdout)
@@ -347,15 +346,22 @@ class Executor(object):
 
     def write_header(self, fname, cfreq, bw, total_nchans,
                      integration_time, timestamp, tag):
+        # read analysis band:
+        abw = self._interface.get_analysis_bandwidth()
         header_dict = {
             "Center Frequency in Hz": cfreq.to(u.Hz).value,
+            "Analysis Center Frequency in Hz":cfreq.to(u.Hz).value,
             "Bandwidth in Hz": bw.to(u.Hz).value,
+            "Analysis Bandwidth in Hz":abw.to(u.Hz).value,
+            "Center Frequency in Hz":cfreq.to(u.Hz).value,
+            "Bandwidth in Hz":bw.to(u.Hz).value,
             "Number of Channels": total_nchans,
             "Frequency Spacing": "uniform",
             "Integration time in milliseconds": integration_time.to(u.ms).value,
             "Unique Scan ID": fname.split("/")[-1].strip(".rfi"),
             "Timestamp": timestamp,
             "User Friendly Name": tag
+
         }
         for param in self._config["headerInformation"]:
             header_dict[param["key"]] = param["value"]
@@ -378,16 +384,24 @@ class Executor(object):
 
         scaling_level = self._interface.get_scaling()
         log.info("Scaling level: {}".format(str(scaling_level)))
-
-        log.info("Output directory: {}".format(measurement._output_path))
+        output_dir = "/".join((measurement._output_path, time.strftime("%Y%m%d-%H%M%S/")))
+        log.info("Output directory: {}".format(output_dir))
 
         try:
-            os.makedirs(measurement._output_path)
+            os.makedirs(output_dir)
         except FileExistsError:
             pass
         except Exception as error:
             log.exception("Cannot create output directory")
             raise error
+    
+        try:
+            os.chown(output_dir, 1000, 1000)
+        except Exception as error:
+            log.exception("Cannot CHOWN output directory to rfiops")
+            raise error
+
+
 
         # Calculate the required FFT length and number of accumulated
         # spectra required to satisfy the resolution and integration
@@ -445,7 +459,7 @@ class Executor(object):
                 str(actual_frequency)))
             timestamp = int(time.time() * 1000)
             filename_stem = "{}/{}_{:0.05}_{}".format(
-                measurement._output_path,
+                output_dir,
                 measurement._tag,
                 actual_frequency.to(u.MHz).value,
                 timestamp)
